@@ -36,8 +36,7 @@ impl<'a> LedTask<'a> {
     pub fn poll(&mut self) {
         match self.state {
             LedState::Toggle => {
-                rprintln!("Blinking LED {}", self.active_col);
-                self.cols[self.active_col].toggle().ok();
+                self.toggle();
                 let timer = Timer::new(500.millis());
                 self.state = LedState::Wait(timer);
             }
@@ -52,6 +51,21 @@ impl<'a> LedTask<'a> {
                 }
             }
         }
+    }
+
+    fn toggle(&mut self) -> Option<()> {
+        rprintln!("Blinking LED {}", self.active_col);
+        #[cfg(feature = "trigger-overflow")]
+        {
+            use crate::time::Ticker;
+            let time = Ticker::now();
+            rprintln!(
+                "Time: 0x{:x} ticks, {} ms",
+                time.ticks(),
+                time.duration_since_epoch().to_millis(),
+            )
+        }
+        self.cols[self.active_col].toggle().ok()
     }
 
     fn shift(&mut self, direction: ButtonDirection) {

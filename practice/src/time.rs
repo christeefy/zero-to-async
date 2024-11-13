@@ -34,6 +34,9 @@ static TICKER: Ticker = Ticker {
     rtc: Mutex::new(RefCell::new(None)),
 };
 
+/// Keeps track of time for the system using RTC0, which ticks away at a rate
+/// of 32,768/sec using a low-power oscillator that runs even when the core is
+/// powered down.
 pub struct Ticker {
     // Overflow counter
     ovr_count: AtomicU32,
@@ -41,9 +44,20 @@ pub struct Ticker {
 }
 
 impl Ticker {
+    /// Called on startup to get RTC0 going, then hoists the HAL representation
+    /// of RTC0 into the `static TICKER`, where it can be accessed by the
+    /// interrupt handler function or any `TickTimer` instance.
     pub fn init(rtc0: RTC0, nvic: &mut NVIC) {
         let mut rtc = Rtc::new(rtc0, 0).unwrap();
         rtc.enable_counter();
+        #[cfg(feature = "trigger-overflow")]
+        {
+            rtc.trigger_overflow();
+            // wait for the counter to initialize with its close-to-overflow
+            // value before going any further, otherwise one of the tasks could
+            // schedule a wakeup that will get skipped over when init happens.
+            while rtc.get_counter() == 0 {}
+        }
         rtc.enable_event(RtcInterrupt::Overflow);
         rtc.enable_interrupt(RtcInterrupt::Overflow, Some(nvic));
         critical_section::with(|cs| TICKER.rtc.replace(cs, Some(rtc))); // Temporarily disables interrupts
