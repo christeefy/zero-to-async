@@ -6,35 +6,28 @@ use microbit::{
 };
 use rtt_target::rprintln;
 
-use crate::{
-    button::ButtonDirection,
-    channel::Receiver,
-    time::{Ticker, Timer},
-};
+use crate::{button::ButtonDirection, channel::Receiver, time::Timer};
 
-enum LedState<'a> {
+enum LedState {
     Toggle,
-    Wait(Timer<'a>),
+    Wait(Timer),
 }
 
 pub struct LedTask<'a> {
     cols: [Pin<Output<PushPull>>; NUM_COLS],
-    ticker: &'a Ticker,
     active_col: usize,
-    state: LedState<'a>,
+    state: LedState,
     receiver: Receiver<'a, ButtonDirection>,
 }
 
 impl<'a> LedTask<'a> {
     pub fn new(
         col: [Pin<Output<PushPull>>; NUM_COLS],
-        ticker: &'a Ticker,
         receiver: Receiver<'a, ButtonDirection>,
     ) -> Self {
         Self {
             cols: col,
             active_col: 0,
-            ticker,
             state: LedState::Toggle,
             receiver,
         }
@@ -45,7 +38,7 @@ impl<'a> LedTask<'a> {
             LedState::Toggle => {
                 rprintln!("Blinking LED {}", self.active_col);
                 self.cols[self.active_col].toggle().ok();
-                let timer = Timer::new(500.millis(), self.ticker);
+                let timer = Timer::new(500.millis());
                 self.state = LedState::Wait(timer);
             }
             LedState::Wait(ref timer) => {
