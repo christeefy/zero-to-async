@@ -40,7 +40,7 @@ impl<'a> ButtonTask<'a> {
         gpiote: &Gpiote,
     ) -> Self {
         Self {
-            input: InputChannel::new(pin, &gpiote),
+            input: InputChannel::new(pin, gpiote),
             state: ButtonState::WaitForPress,
             direction,
             sender,
