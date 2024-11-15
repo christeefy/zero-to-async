@@ -78,8 +78,8 @@ impl OurFuture for LedTask<'_> {
                     self.state = LedState::Wait(timer);
                     continue;
                 }
-                LedState::Wait(ref timer) => {
-                    if timer.is_ready() {
+                LedState::Wait(ref mut timer) => {
+                    if let Poll::Ready(_) = timer.poll(task_id) {
                         self.state = LedState::Toggle;
                         continue;
                     }
