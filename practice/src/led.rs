@@ -6,7 +6,12 @@ use microbit::{
 };
 use rtt_target::rprintln;
 
-use crate::{button::ButtonDirection, channel::Receiver, time::Timer};
+use crate::{
+    button::ButtonDirection,
+    channel::Receiver,
+    future::{OurFuture, Poll},
+    time::Timer,
+};
 
 enum LedState {
     Toggle,
@@ -30,26 +35,6 @@ impl<'a> LedTask<'a> {
             active_col: 0,
             state: LedState::Toggle,
             receiver,
-        }
-    }
-
-    pub fn poll(&mut self) {
-        match self.state {
-            LedState::Toggle => {
-                self.toggle();
-                let timer = Timer::new(500.millis());
-                self.state = LedState::Wait(timer);
-            }
-            LedState::Wait(ref timer) => {
-                if timer.is_ready() {
-                    self.state = LedState::Toggle;
-                }
-                if let Some(direction) = self.receiver.receive() {
-                    self.cols[self.active_col].set_high().ok();
-                    self.shift(direction);
-                    self.state = LedState::Toggle;
-                }
-            }
         }
     }
 
@@ -78,5 +63,36 @@ impl<'a> LedTask<'a> {
         };
         // switch off new LED: moving to Toggle will then switch it on
         self.cols[self.active_col].set_high().ok();
+    }
+}
+
+impl OurFuture for LedTask<'_> {
+    type Output = ();
+
+    fn poll(&mut self, task_id: usize) -> Poll<Self::Output> {
+        loop {
+            match self.state {
+                LedState::Toggle => {
+                    self.toggle();
+                    let timer = Timer::new(500.millis());
+                    self.state = LedState::Wait(timer);
+                    continue;
+                }
+                LedState::Wait(ref timer) => {
+                    if timer.is_ready() {
+                        self.state = LedState::Toggle;
+                        continue;
+                    }
+                    if let Some(direction) = self.receiver.receive() {
+                        self.cols[self.active_col].set_high().ok();
+                        self.shift(direction);
+                        self.state = LedState::Toggle;
+                        continue;
+                    }
+                    break;
+                }
+            };
+        }
+        Poll::Pending
     }
 }
